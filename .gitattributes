@@ -1,7 +1,7 @@
+installer/electron/runtime/version filter=lfs diff=lfs merge=lfs -text
 installer/nodejs/node.exe filter=lfs diff=lfs merge=lfs -text
 installer/electron/runtime/electron.exe filter=lfs diff=lfs merge=lfs -text
 installer/electron/runtime/*.dll filter=lfs diff=lfs merge=lfs -text
 installer/electron/runtime/*.pak filter=lfs diff=lfs merge=lfs -text
 installer/electron/runtime/*.bin filter=lfs diff=lfs merge=lfs -text
 installer/electron/runtime/icudtl.dat filter=lfs diff=lfs merge=lfs -text
-installer/electron/runtime/version filter=lfs diff=lfs merge=lfs -text
