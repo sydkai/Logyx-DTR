@@ -1,0 +1,25 @@
+---
+description: Logyx DTR React project context
+alwaysApply: true
+---
+
+# Logyx DTR
+
+Project root: `c:\Users\USER\Desktop\Logyx DTR React`
+
+## Structure
+- `client/` — React + Vite frontend (port 5173)
+- `server/` — Node.js + Express + SQLite API
+
+## Key paths
+- Pages: `client/src/pages/` (ScannerPage, RecordsPage, EmployeesPage, LeavePage, BarcodesPage, LoginPage)
+- API clients: `client/src/api/` (axios.js, records.js, employees.js, auth.js, leave.js)
+- Layout: `client/src/components/Layout.jsx`
+- Auth: `client/src/context/AuthContext.jsx`
+- Global styles: `client/src/index.css` (CSS variables: --accent, --surface, --muted, etc.)
+- Page styles: colocated as `RecordsPage.css`, `EmployeesPage.css` next to each page
+
+## Conventions
+- Dark cyberpunk UI with neon green accent
+- Admin routes: records, employees, barcodes (protected via AdminRoute)
+- Public routes: scanner, leave

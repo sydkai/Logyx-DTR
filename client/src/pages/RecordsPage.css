@@ -1,0 +1,166 @@
+.records-panel {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  width: min(1200px, calc(100% - 64px));
+  margin: 24px auto;
+}
+
+.records-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.records-filters .search-input {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.records-filters .date-input,
+.records-filters .type-select {
+  flex: 0 1 auto;
+}
+
+.records-table-wrap {
+  overflow-x: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.records-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px 0;
+}
+
+.page-link {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-family: 'Syne', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.page-link.active {
+  color: var(--accent);
+  border-color: rgba(0, 229, 160, 0.35);
+  background: rgba(0, 229, 160, 0.12);
+}
+
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.records-table th,
+.records-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.records-table th {
+  color: var(--muted);
+  font-family: 'Syne', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.records-table .col-id {
+  color: var(--accent);
+}
+
+.records-table .col-num {
+  color: var(--muted);
+  width: 40px;
+}
+
+.records-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  z-index: 2;
+}
+
+.records-footer .btn {
+  font-size: 0.62rem;
+  padding: 7px 10px;
+  gap: 6px;
+}
+
+.records-footer svg {
+  width: 12px;
+  height: 12px;
+}
+
+.records-panel .panel-header {
+  padding: 12px 16px;
+}
+
+.records-panel .panel-title {
+  font-size: 0.75rem;
+}
+
+.records-panel .panel-count {
+  font-size: 0.68rem;
+}
+
+.records-filters .form-input,
+.records-filters .form-select {
+  font-size: 0.72rem;
+  padding: 8px 10px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge.time-in {
+  color: var(--in-color);
+  border-color: rgba(0, 229, 160, 0.25);
+  background: rgba(0, 229, 160, 0.08);
+}
+
+.badge.time-out {
+  color: var(--out-color);
+  border-color: rgba(255, 107, 53, 0.25);
+  background: rgba(255, 107, 53, 0.08);
+}
+
+.badge.overtime {
+  color: var(--ot-color);
+  border-color: rgba(167, 139, 250, 0.25);
+  background: rgba(167, 139, 250, 0.08);
+}

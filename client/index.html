@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+    <title>Logyx Daily Time Record</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      window.onerror = function(msg, url, line, col, err) {
+        var el = document.createElement('div');
+        el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0a0c10;color:#ff6b35;padding:30px;font-family:monospace;font-size:13px;overflow:auto;white-space:pre-wrap;word-break:break-all';
+        el.innerHTML = '<b>GLOBAL ERROR</b>\n' + msg + '\n' + url + ':' + line + ':' + col + '\n' + (err && err.stack ? err.stack : '');
+        document.body.appendChild(el);
+        document.body.style.background = '#0a0c10';
+      };
+      window.onunhandledrejection = function(e) {
+        var el = document.createElement('div');
+        el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0a0c10;color:#f59e0b;padding:30px;font-family:monospace;font-size:13px;overflow:auto;white-space:pre-wrap;word-break:break-all';
+        el.innerHTML = '<b>UNHANDLED PROMISE REJECTION</b>\n' + (e.reason && e.reason.stack ? e.reason.stack : e.reason);
+        document.body.appendChild(el);
+        document.body.style.background = '#0a0c10';
+      };
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

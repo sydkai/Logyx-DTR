@@ -1,0 +1,10 @@
+{
+  "folders": [
+    { "name": "Logyx DTR (root)", "path": "." },
+    { "name": "client", "path": "client" },
+    { "name": "server", "path": "server" }
+  ],
+  "settings": {
+    "eslint.workingDirectories": [{ "directory": "client", "changeProcessCWD": true }]
+  }
+}
