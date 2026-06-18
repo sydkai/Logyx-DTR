@@ -3,16 +3,22 @@
   "version": "1.0.0",
   "description": "LOGYX DTR — Backend API",
   "main": "index.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
+    "build:db": "node scripts/build-installer-db.js",
+    "prepare:installer": "node scripts/prepare-installer-runtime.js",
+    "test": "node scripts/test-login.js",
     "import-roster": "node scripts/import-roster.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^9.4.3",
+    "better-sqlite3": "^12.10.1",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.18.2",
