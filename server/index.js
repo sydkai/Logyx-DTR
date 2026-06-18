@@ -10,6 +10,7 @@ const express = require('express');
 const cors    = require('cors');
 const { runMigrations, usePostgres } = require('./db/database');
 const { seedIfEmpty }   = require('./db/seed');
+const { migrateSqliteToPostgresIfNeeded } = require('./db/migrateSqliteToPg');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -81,6 +82,7 @@ app.use((err, req, res, next) => {
 async function boot() {
   try {
     await runMigrations();
+    await migrateSqliteToPostgresIfNeeded();
     await seedIfEmpty();
     const dbLabel = usePostgres() ? 'PostgreSQL (Neon)' : 'SQLite';
     app.listen(PORT, HOST, () => {
