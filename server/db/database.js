@@ -75,7 +75,10 @@ function createWrapper(sqlite) {
   return {
     query(sql, params = []) {
       return executeQuery(sqlite, sql, params);
-    }
+    },
+    prepare(sql) {
+      return sqlite.prepare(sql);
+    },
   };
 }
 

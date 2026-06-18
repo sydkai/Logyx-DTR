@@ -1,11 +1,9 @@
-// Run with: npm run seed
-const bcrypt          = require('bcryptjs');
-const { getDb, runMigrations } = require('./database');
+'use strict';
 
-runMigrations();
-const db = getDb();
+const bcrypt   = require('bcryptjs');
+const { getDb } = require('./database');
 
-// ── Employees ──────────────────────────────────────────────
+// ─── Employee master data ─────────────────────────────────────────────────────
 const employees = [
   {
     emp_id: 'JRLF-WM-01-05-26', first_name: 'JAF ROLAND', middle_name: 'LARON',
@@ -54,7 +52,7 @@ const employees = [
     present_address: 'AGUINALDO CORDON ISABELA',
     permanent_address: 'AGUINALDO CORDON ISABELA',
     mobile: '9676328456', email: null,
-    corp_email: null, hired_date: '/09/2019',
+    corp_email: null, hired_date: '2019-09-01',
     share: 'B', position: 'RECEIVING DISPATCHING UNIT', title_initials: 'RDU', emp_status: 'ACTIVE'
   },
   {
@@ -109,55 +107,69 @@ const employees = [
   }
 ];
 
-const insertEmp = db.prepare(`
-  INSERT OR IGNORE INTO employees (
-    emp_id, first_name, middle_name, surname, initials,
-    dob, age, gender, civil_status, blood_type,
-    present_address, permanent_address, mobile, email, corp_email,
-    hired_date, share, position, title_initials, emp_status
-  ) VALUES (
-    @emp_id, @first_name, @middle_name, @surname, @initials,
-    @dob, @age, @gender, @civil_status, @blood_type,
-    @present_address, @permanent_address, @mobile, @email, @corp_email,
-    @hired_date, @share, @position, @title_initials, @emp_status
-  )
-`);
+const admins = [
+  {
+    email: 'christopherrodriguez@magallonesgroup.com',
+    name:  'Christopher Rodriguez',
+    role:  'superadmin',
+    password: 'naba6819',
+  },
+  {
+    email: 'jaf@magallonesgroup.com',
+    name:  'Jaf Roland Fajardo',
+    role:  'superadmin',
+    password: 'MVVC@jaf123',
+  },
+];
 
-const seedEmployees = db.transaction(() => {
-  let count = 0;
-  for (const emp of employees) {
-    const result = insertEmp.run(emp);
-    if (result.changes) count++;
+// ─── seedIfEmpty ──────────────────────────────────────────────────────────────
+// Called automatically by server/index.js on every boot.
+// Only inserts data when tables are genuinely empty — safe to call repeatedly.
+async function seedIfEmpty() {
+  const db = getDb();
+
+  // ── Employees ──
+  const { rows: empRows } = db.query('SELECT COUNT(*) AS cnt FROM employees', []);
+  if (empRows[0].cnt === 0) {
+    let inserted = 0;
+    for (const emp of employees) {
+      const { rowCount } = db.query(`
+        INSERT OR IGNORE INTO employees (
+          emp_id, first_name, middle_name, surname, initials,
+          dob, age, gender, civil_status, blood_type,
+          present_address, permanent_address, mobile, email, corp_email,
+          hired_date, share, position, title_initials, emp_status
+        ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?)
+      `, [
+        emp.emp_id, emp.first_name, emp.middle_name, emp.surname, emp.initials,
+        emp.dob, emp.age, emp.gender, emp.civil_status, emp.blood_type,
+        emp.present_address, emp.permanent_address, emp.mobile, emp.email, emp.corp_email,
+        emp.hired_date, emp.share, emp.position, emp.title_initials, emp.emp_status
+      ]);
+      if (rowCount) inserted++;
+    }
+    console.log(`✔ Employees seeded: ${inserted} inserted`);
+  } else {
+    console.log(`✔ Employees already present — skipping seed`);
   }
-  return count;
-});
 
-const empCount = seedEmployees();
-console.log(`✓ Employees seeded: ${empCount} inserted (skipped duplicates)`);
+  // ── Admins ──
+  // Always upsert admins so password changes in this file take effect on next boot.
+  for (const admin of admins) {
+    const hash = bcrypt.hashSync(admin.password, 10);
+    db.query(`
+      INSERT INTO admins (email, password_hash, name, role, is_active)
+      VALUES (?, ?, ?, ?, 1)
+      ON CONFLICT(email) DO UPDATE SET
+        password_hash = excluded.password_hash,
+        name          = excluded.name,
+        role          = excluded.role,
+        is_active     = 1
+    `, [admin.email, hash, admin.name, admin.role]);
+    console.log(`✔ Admin ready: ${admin.email}`);
+  }
 
-// ── Default superadmin ─────────────────────────────────────
-// Change this password before deploying to production!
-const DEFAULT_PASSWORD = 'naba6819';
-const hash = bcrypt.hashSync(DEFAULT_PASSWORD, 10);
-
-const insertAdmin = db.prepare(`
-  INSERT OR IGNORE INTO admins (email, password_hash, name, role)
-  VALUES (?, ?, ?, ?)
-`);
-
-const adminResult = insertAdmin.run(
-  'christopherrodriguez@magallonesgroup.com',
-  hash,
-  'System Admin',
-  'superadmin'
-);
-
-if (adminResult.changes) {
-  console.log('✓ Default admin created:');
-  console.log('  Email:    christopherrodriguez@magallonesgroup.com');
-  console.log('  Password: naba6819  ← CHANGE THIS BEFORE GOING LIVE');
-} else {
-  console.log('· Admin already exists, skipped.');
+  console.log('✔ Seed complete.\n');
 }
 
-console.log('\n✓ Seed complete.');
+module.exports = { seedIfEmpty };
