@@ -31,6 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth',      require('./routes/auth'));
+app.use('/api/scan',      require('./routes/scan'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/records',   require('./routes/records'));
 app.use('/api/leave',     require('./routes/leave'));

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getEmployees } from '../api/employees';
+import { getEmployees, lookupScannedEmployee } from '../api/employees';
 import { createRecord, getTodayRecords } from '../api/records';
 import { getLeaves } from '../api/leave';
 import LiveClock from '../components/LiveClock';
@@ -9,6 +9,7 @@ import {
 } from '../lib/localTime';
 import { useLeave } from '../context/LeaveContext';
 import LeaveCalendar from '../components/LeaveCalendar';
+import { extractEmployeeId } from '../lib/scanUtils';
 
 const LATE_CUTOFF_MINS   = 8 * 60 + 5;
 const ABSENT_CUTOFF_MINS = 17 * 60;
@@ -60,9 +61,7 @@ export default function ScannerPage() {
   const { submissions } = useLeave();
 
   const fbTimer   = useRef(null);
-  const bufTimer  = useRef(null);
   const hiddenRef = useRef(null);
-  const bufferRef = useRef('');
   const processIdRef = useRef(null);
 
   const loadData = useCallback(async () => {
@@ -96,6 +95,7 @@ export default function ScannerPage() {
       }
     } catch (e) {
       console.error(e);
+      setFeedback({ type: 'error', msg: 'Could not load employees. Please log in and refresh.' });
     }
   }, []);
 
@@ -123,73 +123,24 @@ export default function ScannerPage() {
     return () => clearInterval(id);
   }, [otForced]);
 
-  // Barcode scanners can include hidden prefix/suffix chars depending on device config.
-  // Canonicalize to a "looks like an employee id" token for matching.
-  const normalizeScanId = (raw) => {
-    const s = String(raw || '')
-      // remove control chars (CR/LF/TAB etc.)
-      .replace(/[\x00-\x1F\x7F]/g, '')
-      // strip common wrapper chars added by some scanners / symbologies
-      .replace(/^[*%]+|[*%]+$/g, '')
-      .trim();
-
-    // keep only characters we expect in our IDs (letters/numbers/- and /)
-    const canonical = s.replace(/[^A-Za-z0-9/-]/g, '').trim();
-    return canonical || s;
-  };
-
-  const findEmployee = useCallback((rawId, pool = employees) => {
-    const id = normalizeScanId(rawId);
-    if (!id) return null;
-    const upper = id.toUpperCase();
-    return pool.find((e) => {
-      const empId = normalizeScanId(e.emp_id);
-      return empId === id || empId.toUpperCase() === upper;
-    }) || null;
-  }, [employees]);
-
-  const clearScanBuffer = () => {
-    bufferRef.current = '';
-    setBuffer('');
+  const clearScanInput = () => {
     if (hiddenRef.current) hiddenRef.current.value = '';
-    clearTimeout(bufTimer.current);
+    setBuffer('');
   };
 
-  const submitScan = (raw) => {
-    const id = normalizeScanId(raw);
-    clearScanBuffer();
-    if (id) processIdRef.current?.(id);
+  const handleScanSubmit = () => {
+    const raw = hiddenRef.current?.value ?? '';
+    clearScanInput();
+    if (!String(raw).trim()) return;
+    processIdRef.current?.(raw);
   };
 
   useEffect(() => {
     if (scannerOn) {
-      hiddenRef.current?.focus();
-    } else {
-      clearScanBuffer();
+      const t = setTimeout(() => hiddenRef.current?.focus(), 0);
+      return () => clearTimeout(t);
     }
-  }, [scannerOn]);
-
-  useEffect(() => {
-    if (!scannerOn) return;
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const fromInput = hiddenRef.current?.value ?? '';
-        submitScan(fromInput || bufferRef.current);
-        return;
-      }
-
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        bufferRef.current += e.key;
-        setBuffer(bufferRef.current);
-        clearTimeout(bufTimer.current);
-        bufTimer.current = setTimeout(clearScanBuffer, 250);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    clearScanInput();
   }, [scannerOn]);
 
   useEffect(() => {
@@ -253,30 +204,32 @@ export default function ScannerPage() {
     } catch {}
   };
 
-  const processId = useCallback(async (rawId) => {
-    const id = normalizeScanId(rawId);
-    let emp = findEmployee(id);
+  const processId = useCallback(async (rawScan) => {
+    const parsed = extractEmployeeId(rawScan);
+    let emp = employees.find((e) => extractEmployeeId(e.emp_id) === parsed);
 
-    // Fallback: if the local list hasn't loaded yet (or is stale), ask the server.
     if (!emp) {
       try {
-        const res = await getEmployees({ search: id });
-        const remoteList = res?.data || [];
-        emp = findEmployee(id, remoteList);
-        if (remoteList.length && !employees.length) {
-          setEmployees(remoteList);
+        emp = await lookupScannedEmployee(rawScan);
+        if (emp) {
+          setEmployees((prev) => (
+            prev.some((e) => e.emp_id === emp.emp_id) ? prev : [...prev, emp]
+          ));
         }
       } catch {
-        // ignore; we'll show not-found below
+        // fall through to not-found message
       }
     }
 
     if (!emp) {
-      showFeedback('error', `Employee ID "${id || rawId}" not found.`);
+      showFeedback(
+        'error',
+        `Employee not found (scanned: "${String(rawScan).trim().slice(0, 48)}"). Check Barcodes page for your ID.`,
+      );
       return;
     }
 
-    const empRecs = todayRecs.filter(r => r.employee_id === id);
+    const empRecs = todayRecs.filter((r) => r.employee_id === emp.emp_id);
     const hasMorningIn = empRecs.some(r => r.type === 'IN');
     const hasLunchOut = empRecs.some(r => r.type === 'LUNCH-OUT');
     let type;
@@ -320,7 +273,7 @@ export default function ScannerPage() {
     } catch (e) {
       showFeedback('error', e.response?.data?.error || e.message || 'Failed to record scan.');
     }
-  }, [employees, todayRecs, otForced, loadData, findEmployee]);
+  }, [employees, todayRecs, otForced, loadData]);
 
   useEffect(() => {
     processIdRef.current = processId;
@@ -420,14 +373,14 @@ export default function ScannerPage() {
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        aria-hidden="true"
+        aria-label="Barcode scanner input"
         tabIndex={scannerOn ? 0 : -1}
         style={{ position:'fixed', left:-9999, top:0, opacity:0, width:1, height:1 }}
         onKeyDown={(e) => {
           if (!scannerOn) return;
           if (e.key === 'Enter') {
             e.preventDefault();
-            submitScan(e.currentTarget.value || bufferRef.current);
+            handleScanSubmit();
           }
         }}
       />
