@@ -27,8 +27,10 @@ function handleUpload(req, res, next) {
 router.post('/import',          requireAuth, handleUpload, ctrl.importExcel);
 router.get('/export/excel',     requireAuth, ctrl.exportExcel);
 
-// Employee CRUD — all require auth
-router.get('/',                 requireAuth, ctrl.list);
+// Public — scanner needs employee lookup without login
+router.get('/',                 ctrl.list);
+
+// Employee CRUD — write operations require auth
 router.get('/:empId',          requireAuth, ctrl.get);
 router.post('/',               requireAuth, ctrl.create);
 router.put('/:empId',          requireAuth, ctrl.update);
