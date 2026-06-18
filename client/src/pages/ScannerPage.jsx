@@ -123,17 +123,26 @@ export default function ScannerPage() {
     return () => clearInterval(id);
   }, [otForced]);
 
-  const normalizeScanId = (raw) =>
-    String(raw || '')
+  // Barcode scanners can include hidden prefix/suffix chars depending on device config.
+  // Canonicalize to a "looks like an employee id" token for matching.
+  const normalizeScanId = (raw) => {
+    const s = String(raw || '')
+      // remove control chars (CR/LF/TAB etc.)
       .replace(/[\x00-\x1F\x7F]/g, '')
+      // strip common wrapper chars added by some scanners / symbologies
       .replace(/^[*%]+|[*%]+$/g, '')
       .trim();
 
-  const findEmployee = useCallback((rawId) => {
+    // keep only characters we expect in our IDs (letters/numbers/- and /)
+    const canonical = s.replace(/[^A-Za-z0-9/-]/g, '').trim();
+    return canonical || s;
+  };
+
+  const findEmployee = useCallback((rawId, pool = employees) => {
     const id = normalizeScanId(rawId);
     if (!id) return null;
     const upper = id.toUpperCase();
-    return employees.find((e) => {
+    return pool.find((e) => {
       const empId = normalizeScanId(e.emp_id);
       return empId === id || empId.toUpperCase() === upper;
     }) || null;
@@ -246,9 +255,24 @@ export default function ScannerPage() {
 
   const processId = useCallback(async (rawId) => {
     const id = normalizeScanId(rawId);
-    const emp = findEmployee(id);
+    let emp = findEmployee(id);
+
+    // Fallback: if the local list hasn't loaded yet (or is stale), ask the server.
     if (!emp) {
-      showFeedback('error', `Employee ID "${id || rawId}" not found. Check Barcodes page for the correct ID.`);
+      try {
+        const res = await getEmployees({ search: id });
+        const remoteList = res?.data || [];
+        emp = findEmployee(id, remoteList);
+        if (remoteList.length && !employees.length) {
+          setEmployees(remoteList);
+        }
+      } catch {
+        // ignore; we'll show not-found below
+      }
+    }
+
+    if (!emp) {
+      showFeedback('error', `Employee ID "${id || rawId}" not found.`);
       return;
     }
 
