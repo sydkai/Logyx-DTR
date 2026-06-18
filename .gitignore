@@ -11,6 +11,10 @@ installer/LogyxDTR-Setup.exe
 .env
 server/.env
 client/.env
+render.env
+
+# Data directory (SQLite on cloud)
+data/
 
 # Logs
 *.log

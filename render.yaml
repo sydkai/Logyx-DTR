@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: logyx-dtr
+    runtime: node
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: cd server && node index.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: "0.0.0.0"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: SQLITE_PATH
+        value: /opt/render/project/src/data/logyx.db
