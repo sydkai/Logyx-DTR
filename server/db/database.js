@@ -79,6 +79,9 @@ function createWrapper(sqlite) {
     prepare(sql) {
       return sqlite.prepare(sql);
     },
+    transaction(fn) {
+      return sqlite.transaction(fn);
+    },
   };
 }
 

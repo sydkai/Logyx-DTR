@@ -104,6 +104,16 @@ const employees = [
     mobile: '9774881500', email: 'rapmacapulay31@gmail.com',
     corp_email: 'raprapmacapulay@magallonesgroup.com', hired_date: '2025-04-25',
     share: 'B', position: 'MANAGEMENT INFORMATION SYSTEM', title_initials: 'MIS', emp_status: 'ACTIVE'
+  },
+  {
+    emp_id: 'MBR-C-13-11-23', first_name: 'MARILYN', middle_name: 'BASILA',
+    surname: 'ROMANO', initials: 'MBR', dob: '1991-07-27', age: 34,
+    gender: 'FEMALE', civil_status: 'MARRIED', blood_type: null,
+    present_address: 'BRGY. CAVITE GUIMBA NUEVA ECIJA',
+    permanent_address: 'BRGY. CAVITE GUIMBA NUEVA ECIJA',
+    mobile: '+63 923 619 2794', email: '12144marilynromano@gmail.com',
+    corp_email: null, hired_date: null,
+    share: 'A', position: 'CASHIER', title_initials: 'C', emp_status: 'ACTIVE'
   }
 ];
 
@@ -129,29 +139,49 @@ async function seedIfEmpty() {
   const db = getDb();
 
   // ── Employees ──
-  const { rows: empRows } = db.query('SELECT COUNT(*) AS cnt FROM employees', []);
-  if (empRows[0].cnt === 0) {
-    let inserted = 0;
-    for (const emp of employees) {
-      const { rowCount } = db.query(`
-        INSERT OR IGNORE INTO employees (
-          emp_id, first_name, middle_name, surname, initials,
-          dob, age, gender, civil_status, blood_type,
-          present_address, permanent_address, mobile, email, corp_email,
-          hired_date, share, position, title_initials, emp_status
-        ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?)
-      `, [
-        emp.emp_id, emp.first_name, emp.middle_name, emp.surname, emp.initials,
-        emp.dob, emp.age, emp.gender, emp.civil_status, emp.blood_type,
-        emp.present_address, emp.permanent_address, emp.mobile, emp.email, emp.corp_email,
-        emp.hired_date, emp.share, emp.position, emp.title_initials, emp.emp_status
-      ]);
-      if (rowCount) inserted++;
-    }
-    console.log(`✔ Employees seeded: ${inserted} inserted`);
-  } else {
-    console.log(`✔ Employees already present — skipping seed`);
+  // Always upsert roster so cloud stays in sync after deploys.
+  let inserted = 0;
+  let updated = 0;
+  for (const emp of employees) {
+    const { rows } = db.query('SELECT emp_id FROM employees WHERE emp_id = ?', [emp.emp_id]);
+    db.query(`
+      INSERT INTO employees (
+        emp_id, first_name, middle_name, surname, initials,
+        dob, age, gender, civil_status, blood_type,
+        present_address, permanent_address, mobile, email, corp_email,
+        hired_date, share, position, title_initials, emp_status
+      ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?)
+      ON CONFLICT(emp_id) DO UPDATE SET
+        first_name = excluded.first_name,
+        middle_name = excluded.middle_name,
+        surname = excluded.surname,
+        initials = excluded.initials,
+        dob = excluded.dob,
+        age = excluded.age,
+        gender = excluded.gender,
+        civil_status = excluded.civil_status,
+        blood_type = excluded.blood_type,
+        present_address = excluded.present_address,
+        permanent_address = excluded.permanent_address,
+        mobile = excluded.mobile,
+        email = excluded.email,
+        corp_email = excluded.corp_email,
+        hired_date = excluded.hired_date,
+        share = excluded.share,
+        position = excluded.position,
+        title_initials = excluded.title_initials,
+        emp_status = excluded.emp_status,
+        updated_at = datetime('now')
+    `, [
+      emp.emp_id, emp.first_name, emp.middle_name, emp.surname, emp.initials,
+      emp.dob, emp.age, emp.gender, emp.civil_status, emp.blood_type,
+      emp.present_address, emp.permanent_address, emp.mobile, emp.email, emp.corp_email,
+      emp.hired_date, emp.share, emp.position, emp.title_initials, emp.emp_status
+    ]);
+    if (rows[0]) updated += 1;
+    else inserted += 1;
   }
+  console.log(`✔ Employees synced: ${inserted} new, ${updated} updated (${employees.length} total in roster)`);
 
   // ── Admins ──
   // Always upsert admins so password changes in this file take effect on next boot.

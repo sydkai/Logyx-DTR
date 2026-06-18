@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getEmployees } from '../api/employees';
-import { createRecord } from '../api/records';
-import { api } from '../api';
+import { createRecord, getTodayRecords } from '../api/records';
 import { getLeaves } from '../api/leave';
 import LiveClock from '../components/LiveClock';
 import {
@@ -9,6 +8,7 @@ import {
   getScanTimestamp,
 } from '../lib/localTime';
 import { useLeave } from '../context/LeaveContext';
+import LeaveCalendar from '../components/LeaveCalendar';
 
 const LATE_CUTOFF_MINS   = 8 * 60 + 5;
 const ABSENT_CUTOFF_MINS = 17 * 60;
@@ -32,7 +32,7 @@ function getShiftLabel(mode) {
   if (mode === 'OT')        return 'Overtime';
   if (mode === 'IN')        return 'Morning shift (1:00 AM – 11:59 AM)';
   if (mode === 'LUNCH-OUT') return 'Lunch break starts (12:00 NN)';
-  if (mode === 'LUNCH-IN')  return 'Back from lunch (1:00 PM – 4:59 PM)';
+  if (mode === 'LUNCH-IN')  return 'Time In after lunch (1:00 PM – 4:59 PM)';
   if (mode === 'OUT')       return 'End of day (5:00 PM onwards)';
   return 'Time In';
 }
@@ -59,31 +59,36 @@ export default function ScannerPage() {
   const [absentFired, setAbsentFired]       = useState(false);
   const { submissions } = useLeave();
 
-  const fbTimer  = useRef(null);
-  const bufTimer = useRef(null);
+  const fbTimer   = useRef(null);
+  const bufTimer  = useRef(null);
   const hiddenRef = useRef(null);
+  const bufferRef = useRef('');
+  const processIdRef = useRef(null);
 
   const loadData = useCallback(async () => {
     try {
       const today = getLocalDateString();
-      const [empRes, todayRes] = await Promise.all([
+      const [empRes, todayRecords] = await Promise.all([
         getEmployees(),
-        api.records.list({ date: today }),
+        getTodayRecords(today),
       ]);
 
       setEmployees(empRes.data || []);
-      setTodayRecs(todayRes.records || []);
+      setTodayRecs(todayRecords);
 
       try {
         const leaveRes = await getLeaves();
         const allLeaves = leaveRes.data || [];
 
         const todayLeaves = allLeaves.filter((l) =>
-          l.status === 'approved' && l.date_from <= today && l.date_to >= today,
+          String(l.status).toLowerCase() === 'approved'
+          && l.date_from <= today && l.date_to >= today,
         );
         setLeavesToday(todayLeaves);
 
-        const allApproved = allLeaves.filter((l) => l.status === 'approved');
+        const allApproved = allLeaves.filter((l) =>
+          String(l.status).toLowerCase() === 'approved',
+        );
         setApprovedLeaves(allApproved);
       } catch {
         setLeavesToday([]);
@@ -118,28 +123,65 @@ export default function ScannerPage() {
     return () => clearInterval(id);
   }, [otForced]);
 
+  const normalizeScanId = (raw) =>
+    String(raw || '')
+      .replace(/[\x00-\x1F\x7F]/g, '')
+      .replace(/^[*%]+|[*%]+$/g, '')
+      .trim();
+
+  const findEmployee = useCallback((rawId) => {
+    const id = normalizeScanId(rawId);
+    if (!id) return null;
+    const upper = id.toUpperCase();
+    return employees.find((e) => {
+      const empId = normalizeScanId(e.emp_id);
+      return empId === id || empId.toUpperCase() === upper;
+    }) || null;
+  }, [employees]);
+
+  const clearScanBuffer = () => {
+    bufferRef.current = '';
+    setBuffer('');
+    if (hiddenRef.current) hiddenRef.current.value = '';
+    clearTimeout(bufTimer.current);
+  };
+
+  const submitScan = (raw) => {
+    const id = normalizeScanId(raw);
+    clearScanBuffer();
+    if (id) processIdRef.current?.(id);
+  };
+
   useEffect(() => {
-    if (scannerOn) hiddenRef.current?.focus();
+    if (scannerOn) {
+      hiddenRef.current?.focus();
+    } else {
+      clearScanBuffer();
+    }
   }, [scannerOn]);
 
   useEffect(() => {
     if (!scannerOn) return;
+
     const handleKeyDown = (e) => {
       if (e.key === 'Enter') {
-        if (buffer.trim()) { processId(buffer.trim()); setBuffer(''); }
-        clearTimeout(bufTimer.current);
+        e.preventDefault();
+        const fromInput = hiddenRef.current?.value ?? '';
+        submitScan(fromInput || bufferRef.current);
         return;
       }
-      if (e.key.length === 1) {
-        setBuffer(prev => prev + e.key);
+
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        bufferRef.current += e.key;
+        setBuffer(bufferRef.current);
         clearTimeout(bufTimer.current);
-        bufTimer.current = setTimeout(() => setBuffer(''), 100);
+        bufTimer.current = setTimeout(clearScanBuffer, 250);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scannerOn, buffer, employees, todayRecs, otForced]);
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [scannerOn]);
 
   useEffect(() => {
     if (absentFired) return;
@@ -148,9 +190,14 @@ export default function ScannerPage() {
         setAbsentFired(true);
         clearInterval(id);
         const scannedIds = new Set(todayRecs.map(r => r.employee_id));
-        const absentEmps = employees.filter(e =>
-          e.emp_status === 'ACTIVE' && !scannedIds.has(e.emp_id)
-        );
+        // Day off
+    const todayDow = new Date().getDay();
+    const absentEmps = employees.filter(e =>
+      e.emp_status === 'ACTIVE' &&
+      !scannedIds.has(e.emp_id) &&
+      !(e.rest_day === 'saturday' && todayDow === 6) &&
+      !(e.rest_day === 'sunday'   && todayDow === 0)
+    );
         const stamp = getScanTimestamp();
         for (const emp of absentEmps) {
           try {
@@ -197,9 +244,13 @@ export default function ScannerPage() {
     } catch {}
   };
 
-  const processId = async (id) => {
-    const emp = employees.find(e => e.emp_id === id);
-    if (!emp) { showFeedback('error', `Employee ID "${id}" not found.`); return; }
+  const processId = useCallback(async (rawId) => {
+    const id = normalizeScanId(rawId);
+    const emp = findEmployee(id);
+    if (!emp) {
+      showFeedback('error', `Employee ID "${id || rawId}" not found. Check Barcodes page for the correct ID.`);
+      return;
+    }
 
     const empRecs = todayRecs.filter(r => r.employee_id === id);
     const hasMorningIn = empRecs.some(r => r.type === 'IN');
@@ -218,7 +269,7 @@ export default function ScannerPage() {
 
     try {
       await createRecord({
-        emp_id: id,
+        emp_id: emp.emp_id,
         type,
         status: attStatus,
         note: attStatus === 'late' ? 'Marked late' : null,
@@ -229,23 +280,27 @@ export default function ScannerPage() {
       const typeLabel = {
         IN: 'Time In', OUT: 'Time Out',
         'OT-IN': 'OT In', 'OT-OUT': 'OT Out',
-        'LUNCH-OUT': 'Lunch Out', 'LUNCH-IN': 'Lunch In',
+        'LUNCH-OUT': 'Lunch Out', 'LUNCH-IN': 'Time In',
       }[type];
       const lateTag = attStatus === 'late' ? ' ⚠️ LATE' : attStatus === 'ontime' ? ' ✅ On Time' : '';
 
       showFeedback(
         type.startsWith('OT')                           ? 'ot'      :
-        type === 'IN'                                   ? 'success' :
-        type === 'LUNCH-OUT' || type === 'LUNCH-IN'     ? 'lunch'   : 'out',
+        type === 'IN' || type === 'LUNCH-IN'            ? 'success' :
+        type === 'LUNCH-OUT'                            ? 'lunch'   : 'out',
         `✓ ${typeLabel} — ${emp.first_name} ${emp.surname}${lateTag}`
       );
       setLastScan({ emp, type, attStatus, time: stamp.time });
       triggerFlash(type);
       playBeep(type);
     } catch (e) {
-      showFeedback('error', e.response?.data?.error || 'Failed to record scan.');
+      showFeedback('error', e.response?.data?.error || e.message || 'Failed to record scan.');
     }
-  };
+  }, [employees, todayRecs, otForced, loadData, findEmployee]);
+
+  useEffect(() => {
+    processIdRef.current = processId;
+  }, [processId]);
 
   const sortedScans = [...todayRecs]
     .filter(r => r.type !== 'ABSENT')
@@ -266,7 +321,7 @@ export default function ScannerPage() {
     flash === 'IN'        ? 'rgba(0,229,160,0.15)'   :
     flash === 'OUT'       ? 'rgba(255,107,53,0.15)'  :
     flash === 'LUNCH-OUT' ? 'rgba(251,191,36,0.15)'  :
-    flash === 'LUNCH-IN'  ? 'rgba(251,191,36,0.15)'  :
+    flash === 'LUNCH-IN'  ? 'rgba(0,229,160,0.15)'   :
     flash                 ? 'rgba(167,139,250,0.15)' :
     'var(--surface)';
 
@@ -279,7 +334,9 @@ export default function ScannerPage() {
       ? { background: 'rgba(167,139,250,0.12)', color: 'var(--ot-color)',  border: '1px solid rgba(167,139,250,0.3)' }
       : mode === 'IN'
       ? { background: 'rgba(0,229,160,0.12)',   color: 'var(--accent)',    border: '1px solid rgba(0,229,160,0.3)' }
-      : mode === 'LUNCH-OUT' || mode === 'LUNCH-IN'
+      : mode === 'LUNCH-IN'
+      ? { background: 'rgba(0,229,160,0.12)',   color: 'var(--accent)',    border: '1px solid rgba(0,229,160,0.3)' }
+      : mode === 'LUNCH-OUT'
       ? { background: 'rgba(251,191,36,0.12)',  color: '#fbbf24',          border: '1px solid rgba(251,191,36,0.3)' }
       : { background: 'rgba(255,107,53,0.12)',  color: 'var(--out-color)', border: '1px solid rgba(255,107,53,0.3)' })
   };
@@ -312,7 +369,7 @@ export default function ScannerPage() {
                 <td>{scan.date}</td>
                 <td>{scan.time}</td>
                 <td>
-                  <span className={`badge ${scan.record_type === 'TIME IN' ? 'time-in' : scan.record_type === 'TIME OUT' ? 'time-out' : scan.record_type === 'LUNCH OUT' || scan.record_type === 'LUNCH IN' ? 'lunch' : 'overtime'}`}>
+                  <span className={`badge ${scan.record_type === 'TIME IN' ? 'time-in' : scan.record_type === 'TIME OUT' ? 'time-out' : scan.record_type === 'LUNCH OUT' ? 'lunch' : 'overtime'}`}>
                     <span className="dot" />
                     {scan.record_type}
                   </span>
@@ -330,10 +387,26 @@ export default function ScannerPage() {
     <div>
       <LiveClock />
 
-      {/* Hidden input to capture barcode scanner keystrokes */}
-      <input ref={hiddenRef}
-        style={{ position:'fixed', opacity:0, pointerEvents:'none', width:0, height:0 }}
-        readOnly tabIndex={scannerOn ? 0 : -1} />
+      {/* Hidden input — USB barcode scanners type into the focused field */}
+      <input
+        ref={hiddenRef}
+        type="text"
+        inputMode="none"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        aria-hidden="true"
+        tabIndex={scannerOn ? 0 : -1}
+        style={{ position:'fixed', left:-9999, top:0, opacity:0, width:1, height:1 }}
+        onKeyDown={(e) => {
+          if (!scannerOn) return;
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            submitScan(e.currentTarget.value || bufferRef.current);
+          }
+        }}
+      />
 
       {/* Mode Banner */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -345,7 +418,7 @@ export default function ScannerPage() {
             {mode === 'OT'        ? 'Overtime'  :
              mode === 'IN'        ? 'Time In'   :
              mode === 'LUNCH-OUT' ? 'Lunch Out' :
-             mode === 'LUNCH-IN'  ? 'Lunch In'  :
+             mode === 'LUNCH-IN'  ? 'Time In'   :
                                     'Time Out'}
           </span>
           <span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{getShiftLabel(mode)}</span>
@@ -364,7 +437,7 @@ export default function ScannerPage() {
       {/* Main Grid — 3 columns: Scanner | Attendance | Leaves */}
       <div style={{ display:'grid', gridTemplateColumns:'360px 1.6fr 1fr', gap:20, alignItems:'start' }}>
 
-        {/* ── Column 1: Scanner + Stats ── */}
+        {/* ── Column 1: Scanner + Stats + Calendar ── */}
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
           {/* Scanner Card */}
@@ -384,7 +457,13 @@ export default function ScannerPage() {
             </div>
 
             {/* ON/OFF Toggle Button */}
-            <button onClick={() => setScannerOn(p => !p)}
+            <button onClick={() => {
+                setScannerOn((p) => {
+                  const next = !p;
+                  if (next) setTimeout(() => hiddenRef.current?.focus(), 0);
+                  return next;
+                });
+              }}
               style={{ width:'100%', padding:'28px 0', borderRadius:12,
                 background: scannerOn
                   ? 'linear-gradient(135deg, rgba(0,229,160,0.2), rgba(0,229,160,0.08))'
@@ -432,7 +511,7 @@ export default function ScannerPage() {
                 {{
                   IN: 'Time In', OUT: 'Time Out',
                   'OT-IN': 'OT In', 'OT-OUT': 'OT Out',
-                  'LUNCH-OUT': 'Lunch Out', 'LUNCH-IN': 'Lunch In',
+                  'LUNCH-OUT': 'Lunch Out', 'LUNCH-IN': 'Time In',
                 }[lastScan.type]}
                 {' at '}<strong>{lastScan.time}</strong>
                 {lastScan.attStatus === 'late'   && <span style={{ color:'var(--late-color)', marginLeft:8 }}>⚠️ LATE</span>}
@@ -441,7 +520,7 @@ export default function ScannerPage() {
             )}
           </div>
 
-          {/* Stats */}
+          {/* Stats Row 1 */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
             {[
               { val:stats.in,      lbl:'Time Ins',  color:'var(--in-color)' },
@@ -457,6 +536,8 @@ export default function ScannerPage() {
               </div>
             ))}
           </div>
+
+          {/* Stats Row 2 */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
             {[
               { val:stats.late,   lbl:'Late',     color:'var(--late-color)' },
@@ -472,6 +553,19 @@ export default function ScannerPage() {
               </div>
             ))}
           </div>
+
+          {/* Leave Calendar */}
+          <div style={{ background:'var(--surface)', border:'1px solid var(--border)',
+            borderRadius:12, padding:20 }}>
+            <div style={{ fontFamily:'Syne,sans-serif', fontSize:'0.75rem', fontWeight:700,
+              letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--muted)',
+              marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ width:6, height:6, background:'var(--accent2)', borderRadius:'50%', display:'inline-block' }}/>
+              Leave Calendar
+            </div>
+            <LeaveCalendar submissions={submissions} />
+          </div>
+
         </div>
         {/* ── End Column 1 ── */}
 
