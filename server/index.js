@@ -8,7 +8,7 @@ try { require('dotenv').config({ path: path.join(__dirname, '..', '.env') }); } 
 
 const express = require('express');
 const cors    = require('cors');
-const { runMigrations } = require('./db/database');
+const { runMigrations, usePostgres } = require('./db/database');
 const { seedIfEmpty }   = require('./db/seed');
 
 const app  = express();
@@ -38,7 +38,11 @@ app.use('/api/leave',     require('./routes/leave'));
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    database: usePostgres() ? 'postgresql' : 'sqlite',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // ─── Serve built client in production ────────────────────────────────────────
@@ -77,11 +81,13 @@ app.use((err, req, res, next) => {
 async function boot() {
   try {
     await runMigrations();
-    await seedIfEmpty();         // seeds admins/employees only if tables are empty
+    await seedIfEmpty();
+    const dbLabel = usePostgres() ? 'PostgreSQL (Neon)' : 'SQLite';
     app.listen(PORT, HOST, () => {
       // ⚠ This exact string is detected by Electron main.js to know server is ready
       console.log(`LOGYX_SERVER_READY`);
       console.log(`✔ LOGYX Server running on http://${HOST}:${PORT}`);
+      console.log(`  Database: ${dbLabel}`);
       console.log(`  Local:   http://localhost:${PORT}`);
       console.log(`  Leave:   http://localhost:${PORT}/leave`);
       console.log(`  Health:  http://localhost:${PORT}/api/health\n`);

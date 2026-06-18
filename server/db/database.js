@@ -1,42 +1,53 @@
 'use strict';
 
-const path     = require('path');
-const fs       = require('fs');
-const Database = require('better-sqlite3');
+const path = require('path');
+const fs   = require('fs');
 
-// ─── DB path ──────────────────────────────────────────────────────────────────
-// In packaged Electron, USER_DATA_PATH is injected by main.js via spawn env.
-// In dev / seed runs, falls back to the project root.
+function usePostgres() {
+  return Boolean(process.env.DATABASE_URL);
+}
+
+// ─── SQL helpers ──────────────────────────────────────────────────────────────
+function sqliteSql(sql) {
+  return sql
+    .replace(/\$(\d+)/g, '?')
+    .replace(/ILIKE/gi, 'LIKE')
+    .replace(/CURRENT_TIMESTAMP/gi, "datetime('now')");
+}
+
+function convertQuestionToDollarInSql(sql) {
+  let i = 0;
+  return sql
+    .replace(/datetime\s*\(\s*'now'\s*\)/gi, 'CURRENT_TIMESTAMP')
+    .replace(/\?/g, () => `$${++i}`);
+}
+
+// ─── SQLite ───────────────────────────────────────────────────────────────────
+let _sqlite = null;
+
 function getDbPath() {
-  if (process.env.SQLITE_PATH) {
-    return process.env.SQLITE_PATH;
-  }
+  if (process.env.SQLITE_PATH) return process.env.SQLITE_PATH;
   if (process.env.USER_DATA_PATH) {
     return path.join(process.env.USER_DATA_PATH, 'logyx.db');
   }
-  return path.join(__dirname, '../../logyx.db');
+  return path.join(__dirname, '../../data/logyx.db');
 }
-
-let _db = null;
 
 function getSqliteDb() {
-  if (!_db) {
+  if (!_sqlite) {
+    const Database = require('better-sqlite3');
     const dbPath = getDbPath();
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-    _db = new Database(dbPath);
-    _db.pragma('journal_mode = WAL');
-    _db.pragma('foreign_keys = ON');
+    _sqlite = new Database(dbPath);
+    _sqlite.pragma('journal_mode = WAL');
+    _sqlite.pragma('foreign_keys = ON');
   }
-  return _db;
+  return _sqlite;
 }
 
-// ─── PostgreSQL-compat query adapter ─────────────────────────────────────────
-// Converts $1,$2,... → ? and ILIKE → LIKE so existing route code works as-is.
-function executeQuery(sqlite, sql, params = []) {
+function executeSqliteQuery(sqlite, sql, params = []) {
   const hasReturning = /\bRETURNING\b/i.test(sql);
-  const converted = sql
-    .replace(/\$\d+/g, '?')
-    .replace(/ILIKE/gi, 'LIKE')
+  const converted = sqliteSql(sql)
     .replace(/\s+RETURNING\s+\*/gi, '')
     .trim();
 
@@ -49,7 +60,7 @@ function executeQuery(sqlite, sql, params = []) {
     }
 
     if (hasReturning) {
-      const result   = sqlite.prepare(converted).run(...params);
+      const result = sqlite.prepare(converted).run(...params);
       const tblMatch = sql.match(/INSERT\s+INTO\s+(\w+)/i);
       if (tblMatch && result.lastInsertRowid) {
         const rows = sqlite.prepare(
@@ -62,7 +73,6 @@ function executeQuery(sqlite, sql, params = []) {
 
     const result = sqlite.prepare(converted).run(...params);
     return { rows: [], rowCount: result.changes };
-
   } catch (err) {
     console.error('[DB Error]', err.message);
     console.error('[SQL]', converted);
@@ -71,13 +81,13 @@ function executeQuery(sqlite, sql, params = []) {
   }
 }
 
-function createWrapper(sqlite) {
+function createSqliteWrapper(sqlite) {
   return {
     query(sql, params = []) {
-      return executeQuery(sqlite, sql, params);
+      return Promise.resolve(executeSqliteQuery(sqlite, sql, params));
     },
     prepare(sql) {
-      return sqlite.prepare(sql);
+      return sqlite.prepare(sqliteSql(sql));
     },
     transaction(fn) {
       return sqlite.transaction(fn);
@@ -85,16 +95,77 @@ function createWrapper(sqlite) {
   };
 }
 
-function getDb() {
-  return createWrapper(getSqliteDb());
+// ─── PostgreSQL ───────────────────────────────────────────────────────────────
+let _pgPool = null;
+
+function getPgPool() {
+  if (!_pgPool) {
+    const { Pool } = require('pg');
+    let connectionString = process.env.DATABASE_URL;
+    // channel_binding breaks node-pg on some hosts
+    connectionString = connectionString.replace(/[&?]channel_binding=[^&]*/g, '');
+    _pgPool = new Pool({
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+      max: 10,
+    });
+    _pgPool.on('error', (err) => {
+      console.error('[PG pool error]', err);
+    });
+  }
+  return _pgPool;
 }
 
-// ─── Transaction helper ───────────────────────────────────────────────────────
+async function executePgQuery(poolOrClient, sql, params = []) {
+  const converted = convertQuestionToDollarInSql(sql);
+  try {
+    const result = await poolOrClient.query(converted, params);
+    return { rows: result.rows, rowCount: result.rowCount };
+  } catch (err) {
+    console.error('[DB Error]', err.message);
+    console.error('[SQL]', converted);
+    console.error('[Params]', params);
+    throw err;
+  }
+}
+
+function createPgWrapper(poolOrClient) {
+  return {
+    query(sql, params = []) {
+      return executePgQuery(poolOrClient, sql, params);
+    },
+  };
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+function getDb() {
+  if (usePostgres()) {
+    return createPgWrapper(getPgPool());
+  }
+  return createSqliteWrapper(getSqliteDb());
+}
+
 async function withTransaction(fn) {
+  if (usePostgres()) {
+    const pool = getPgPool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await fn(createPgWrapper(client));
+      await client.query('COMMIT');
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      throw err;
+    } finally {
+      client.release();
+    }
+    return;
+  }
+
   const sqlite = getSqliteDb();
   sqlite.prepare('BEGIN').run();
   try {
-    await fn(createWrapper(sqlite));
+    await fn(createSqliteWrapper(sqlite));
     sqlite.prepare('COMMIT').run();
   } catch (err) {
     try { sqlite.prepare('ROLLBACK').run(); } catch (_) {}
@@ -102,8 +173,7 @@ async function withTransaction(fn) {
   }
 }
 
-// ─── Migrations ───────────────────────────────────────────────────────────────
-async function runMigrations() {
+async function runSqliteMigrations() {
   const sqlite = getSqliteDb();
 
   sqlite.exec(`
@@ -196,17 +266,46 @@ async function runMigrations() {
     );
   `);
 
-  // Default company settings
-  const ins = sqlite.prepare(`INSERT OR IGNORE INTO company_settings (key, value) VALUES (?, ?)`);
-  ins.run('company_name',    'MAGALLONES GROUP');
+  const ins = sqlite.prepare('INSERT OR IGNORE INTO company_settings (key, value) VALUES (?, ?)');
+  ins.run('company_name', 'MAGALLONES GROUP');
   ins.run('registration_no', '');
-  ins.run('work_schedule',   '8:00 AM - 5:00 PM (1 hr lunch break)');
+  ins.run('work_schedule', '8:00 AM - 5:00 PM (1 hr lunch break)');
 
   console.log('✔ SQLite migrations done —', getDbPath());
 }
 
-async function closePool() {
-  if (_db) { _db.close(); _db = null; }
+async function runPgMigrations() {
+  const pool = getPgPool();
+  const migrationPath = path.join(__dirname, 'migrations', '001_init.sql');
+  const sql = fs.readFileSync(migrationPath, 'utf8');
+  await pool.query(sql);
+  await pool.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS rest_day TEXT');
+  console.log('✔ PostgreSQL migrations done — Neon');
 }
 
-module.exports = { getDb, withTransaction, runMigrations, closePool };
+async function runMigrations() {
+  if (usePostgres()) {
+    await runPgMigrations();
+  } else {
+    await runSqliteMigrations();
+  }
+}
+
+async function closePool() {
+  if (_pgPool) {
+    await _pgPool.end();
+    _pgPool = null;
+  }
+  if (_sqlite) {
+    _sqlite.close();
+    _sqlite = null;
+  }
+}
+
+module.exports = {
+  getDb,
+  withTransaction,
+  runMigrations,
+  closePool,
+  usePostgres,
+};

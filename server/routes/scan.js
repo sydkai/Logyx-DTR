@@ -13,7 +13,7 @@ const EMP_FIELDS = `
 `;
 
 // Public — barcode scanner lookup (read-only, no auth)
-router.get('/employee', (req, res) => {
+router.get('/employee', async (req, res) => {
   try {
     const raw = String(req.query.q || req.query.id || '').trim();
     if (!raw) {
@@ -22,7 +22,7 @@ router.get('/employee', (req, res) => {
 
     const target = extractEmployeeId(raw);
     const db = getDb();
-    const employees = db.prepare(`SELECT ${EMP_FIELDS} FROM employees`).all();
+    const { rows: employees } = await db.query(`SELECT ${EMP_FIELDS} FROM employees`);
 
     const emp = employees.find((e) => idsMatch(e.emp_id, target))
       || employees.find((e) => idsMatch(e.emp_id, raw));

@@ -143,14 +143,14 @@ async function seedIfEmpty() {
   let inserted = 0;
   let updated = 0;
   for (const emp of employees) {
-    const { rows } = db.query('SELECT emp_id FROM employees WHERE emp_id = ?', [emp.emp_id]);
-    db.query(`
+    const { rows } = await db.query('SELECT emp_id FROM employees WHERE emp_id = $1', [emp.emp_id]);
+    await db.query(`
       INSERT INTO employees (
         emp_id, first_name, middle_name, surname, initials,
         dob, age, gender, civil_status, blood_type,
         present_address, permanent_address, mobile, email, corp_email,
         hired_date, share, position, title_initials, emp_status
-      ) VALUES (?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?, ?,?,?,?,?)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       ON CONFLICT(emp_id) DO UPDATE SET
         first_name = excluded.first_name,
         middle_name = excluded.middle_name,
@@ -171,7 +171,7 @@ async function seedIfEmpty() {
         position = excluded.position,
         title_initials = excluded.title_initials,
         emp_status = excluded.emp_status,
-        updated_at = datetime('now')
+        updated_at = CURRENT_TIMESTAMP
     `, [
       emp.emp_id, emp.first_name, emp.middle_name, emp.surname, emp.initials,
       emp.dob, emp.age, emp.gender, emp.civil_status, emp.blood_type,
@@ -187,9 +187,9 @@ async function seedIfEmpty() {
   // Always upsert admins so password changes in this file take effect on next boot.
   for (const admin of admins) {
     const hash = bcrypt.hashSync(admin.password, 10);
-    db.query(`
+    await db.query(`
       INSERT INTO admins (email, password_hash, name, role, is_active)
-      VALUES (?, ?, ?, ?, 1)
+      VALUES ($1, $2, $3, $4, 1)
       ON CONFLICT(email) DO UPDATE SET
         password_hash = excluded.password_hash,
         name          = excluded.name,
