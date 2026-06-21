@@ -3,35 +3,46 @@ import { getLeaves, createLeave, reviewLeave } from "../api/leave";
 
 const LeaveContext = createContext(null);
 
+const POLL_MS = 30000;
+
 function toPageLeave(r) {
+  const status = (r.status || "PENDING").toUpperCase();
   return {
     id:         r.id,
     empId:      r.emp_id,
-    name:       `${r.first_name || ""} ${r.surname || ""}`.trim(),
+    name:       r.name || `${r.first_name || ""} ${r.surname || ""}`.trim(),
     leaveType:  r.pay_type || "",
     subtype:    r.type ? r.type.toLowerCase() : "",
     dateFrom:   r.date_from,
     dateTo:     r.date_to,
     remarks:    r.reason || "",
-    status:     (r.status || "pending").toLowerCase(),
+    status:     status.toLowerCase(),
   };
 }
 
 export function LeaveProvider({ children }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const loadLeaves = useCallback(async () => {
     try {
       const res = await getLeaves();
       setSubmissions((res.data || []).map(toPageLeave));
-    } catch {
+      setError(null);
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || "Could not load leave requests.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadLeaves(); }, [loadLeaves]);
+  useEffect(() => {
+    loadLeaves();
+    const id = setInterval(loadLeaves, POLL_MS);
+    return () => clearInterval(id);
+  }, [loadLeaves]);
 
   const submitLeave = async (data) => {
     const payload = {
@@ -57,7 +68,10 @@ export function LeaveProvider({ children }) {
   };
 
   return (
-    <LeaveContext.Provider value={{ submissions, loading, submitLeave, approveLeave, rejectLeave }}>
+    <LeaveContext.Provider value={{
+      submissions, loading, error, loadLeaves,
+      submitLeave, approveLeave, rejectLeave,
+    }}>
       {children}
     </LeaveContext.Provider>
   );

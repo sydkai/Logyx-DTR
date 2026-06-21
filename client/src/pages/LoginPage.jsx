@@ -30,12 +30,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center',
-      justifyContent:'center', position:'relative', zIndex:1 }}>
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', position: 'relative', zIndex: 1,
+      background: '#0a0c10', color: '#e8eaf0',
+    }}>
       <div style={{ width:'100%', maxWidth:400, padding:'0 20px' }}>
         <div style={{ textAlign:'center', marginBottom:40 }}>
-          <div style={{ fontFamily:'Syne,sans-serif', fontSize:'2.5rem', fontWeight:800,
-            color:'var(--accent)', letterSpacing:'0.05em' }}>LOGYX</div>
+          <img
+            src="/logo.png"
+            alt="LOGYX"
+            style={{ display:'inline-block', width:'100%', maxWidth:220, height:'auto' }}
+          />
           <p style={{ color:'var(--muted)', fontSize:'0.75rem', letterSpacing:'0.15em',
             textTransform:'uppercase', marginTop:6 }}>Daily Time Record System</p>
         </div>

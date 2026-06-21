@@ -1,5 +1,15 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import LoginOverlay from './LoginOverlay';
+
+const C = {
+  bg: '#0a0c10',
+  surface: '#111318',
+  border: '#252830',
+  accent: '#00e5a0',
+  muted: '#6b7280',
+  out: '#ff6b35',
+};
 
 const NAV_PUBLIC = [
   { path: '/scanner', label: 'Scanner',       icon: '⬡' },
@@ -14,7 +24,7 @@ const NAV_ADMIN = [
 ];
 
 export default function Layout() {
-  const { admin, logout } = useAuth();
+  const { admin, logout, loginOpen, openLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -23,116 +33,153 @@ export default function Layout() {
   };
 
   const linkStyle = ({ isActive }) => ({
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '10px 16px', borderRadius: 8, textDecoration: 'none',
-    fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: '0.8rem',
-    letterSpacing: '0.08em', textTransform: 'uppercase',
-    color: isActive ? 'var(--accent)' : 'var(--muted)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 16px',
+    borderRadius: 8,
+    textDecoration: 'none',
+    fontFamily: 'Segoe UI, sans-serif',
+    fontWeight: 600,
+    fontSize: '0.8rem',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: isActive ? C.accent : C.muted,
     background: isActive ? 'rgba(0,229,160,0.08)' : 'transparent',
     border: isActive ? '1px solid rgba(0,229,160,0.2)' : '1px solid transparent',
     transition: 'all 0.2s',
   });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <>
+      {loginOpen && <LoginOverlay />}
 
-      {/* ── Sidebar ── */}
-      <aside style={{
-        width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column',
-        padding: '24px 16px', gap: 4,
-        background: 'var(--surface)', borderRight: '1px solid var(--border)',
-        position: 'sticky', top: 0, height: '100vh', overflowY: 'auto',
-      }}>
-
-        {/* Logo */}
-        <div style={{
-          fontFamily: 'Syne, sans-serif', fontSize: '1.5rem', fontWeight: 800,
-          color: 'var(--accent)', letterSpacing: '0.05em',
-          padding: '8px 16px', marginBottom: 24,
+      <div style={{ display: 'flex', minHeight: '100vh', background: C.bg }}>
+        <aside style={{
+          width: 220,
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '24px 16px',
+          gap: 4,
+          background: C.surface,
+          borderRight: `1px solid ${C.border}`,
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          overflowY: 'auto',
         }}>
-          LOGYX
-        </div>
-
-        {/* Public nav — always visible */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {NAV_PUBLIC.map(n => (
-            <NavLink key={n.path} to={n.path} style={linkStyle}>
-              <span>{n.icon}</span> {n.label}
-            </NavLink>
-          ))}
-        </div>
-
-        {/* Admin nav — only visible when logged in */}
-        {admin && (
-          <>
-            <div style={{
-              margin: '16px 16px 8px', fontSize: '0.6rem',
-              letterSpacing: '0.15em', textTransform: 'uppercase',
-              color: 'var(--muted)', opacity: 0.5,
-            }}>
-              Admin
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {NAV_ADMIN.map(n => (
-                <NavLink key={n.path} to={n.path} style={linkStyle}>
-                  <span>{n.icon}</span> {n.label}
-                </NavLink>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Push login/logout to bottom */}
-        <div style={{ flex: 1 }} />
-
-        {/* Bottom: show admin info + logout OR login link */}
-        {admin ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {/* Admin badge */}
-            <div style={{
-              padding: '10px 16px', borderRadius: 8,
-              background: 'rgba(0,229,160,0.06)',
-              border: '1px solid rgba(0,229,160,0.15)',
-              fontSize: '0.72rem', color: 'var(--muted)',
-            }}>
-              <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>
-                {admin.name || admin.email}
-              </div>
-              Admin
-            </div>
-            {/* Logout */}
-            <button onClick={handleLogout} style={{
-              padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-              background: 'rgba(255,107,53,0.08)',
-              border: '1px solid rgba(255,107,53,0.25)',
-              color: 'var(--out-color)', fontFamily: 'Syne, sans-serif',
-              fontWeight: 700, fontSize: '0.75rem',
-              letterSpacing: '0.08em', textTransform: 'uppercase',
-            }}>
-              ⎋ Logout
-            </button>
+          <div style={{ padding: '4px 12px', marginBottom: 24 }}>
+            <img
+              src="/logo.png"
+              alt="LOGYX"
+              style={{ display: 'block', width: '100%', maxWidth: 160, height: 'auto' }}
+            />
           </div>
-        ) : (
-          /* Admin Login link — always visible at bottom when logged out */
-          <NavLink to="/login" style={({ isActive }) => ({
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '10px 16px', borderRadius: 8, textDecoration: 'none',
-            fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: '0.8rem',
-            letterSpacing: '0.08em', textTransform: 'uppercase',
-            color: isActive ? 'var(--accent)' : 'var(--muted)',
-            background: 'rgba(167,139,250,0.06)',
-            border: '1px solid rgba(167,139,250,0.2)',
-            transition: 'all 0.2s',
-          })}>
-            🔐 Admin Login
-          </NavLink>
-        )}
-      </aside>
 
-      {/* ── Main content area ── */}
-      <main style={{ flex: 1, padding: '32px 36px', overflowY: 'auto' }}>
-        <Outlet />
-      </main>
-    </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {NAV_PUBLIC.map((n) => (
+              <NavLink key={n.path} to={n.path} style={linkStyle}>
+                <span>{n.icon}</span> {n.label}
+              </NavLink>
+            ))}
+          </div>
+
+          {admin && (
+            <>
+              <div style={{
+                margin: '16px 16px 8px',
+                fontSize: '0.6rem',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                color: C.muted,
+                opacity: 0.5,
+              }}>
+                Admin
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {NAV_ADMIN.map((n) => (
+                  <NavLink key={n.path} to={n.path} style={linkStyle}>
+                    <span>{n.icon}</span> {n.label}
+                  </NavLink>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          {admin ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{
+                padding: '10px 16px',
+                borderRadius: 8,
+                background: 'rgba(0,229,160,0.06)',
+                border: '1px solid rgba(0,229,160,0.15)',
+                fontSize: '0.72rem',
+                color: C.muted,
+              }}>
+                <div style={{ color: C.accent, fontWeight: 700, marginBottom: 2 }}>
+                  {admin.name || admin.email}
+                </div>
+                Admin
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  background: 'rgba(255,107,53,0.08)',
+                  border: '1px solid rgba(255,107,53,0.25)',
+                  color: C.out,
+                  fontFamily: 'Segoe UI, sans-serif',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                ⎋ Logout
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openLogin}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 16px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontFamily: 'Segoe UI, sans-serif',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: C.muted,
+                background: 'rgba(167,139,250,0.06)',
+                border: '1px solid rgba(167,139,250,0.2)',
+              }}
+            >
+              🔐 Admin Login
+            </button>
+          )}
+        </aside>
+
+        <main style={{
+          flex: 1,
+          padding: '32px 36px',
+          overflowY: 'auto',
+          background: C.bg,
+          color: '#e8eaf0',
+        }}>
+          <Outlet />
+        </main>
+      </div>
+    </>
   );
 }

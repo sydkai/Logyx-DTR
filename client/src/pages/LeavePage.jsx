@@ -76,6 +76,8 @@ export default function LeavePage() {
   const [form, setForm]       = useState(blank);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors]   = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const set = (k) => (e) => {
     setForm(f => ({ ...f, [k]: e.target.value }));
@@ -90,12 +92,22 @@ export default function LeavePage() {
     return Object.keys(newErr).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    submitLeave({ ...form });   // ← writes to shared context
-    setSuccess(true);
-    setForm(blank);
-    setTimeout(() => setSuccess(false), 4000);
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await submitLeave({ ...form });
+      setSuccess(true);
+      setForm(blank);
+      setTimeout(() => setSuccess(false), 4000);
+    } catch (err) {
+      setSubmitError(
+        err.response?.data?.error || err.message || "Could not submit leave request. Check your connection to the office server."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const err = (k) => errors[k] ? { borderColor: C.red } : {};
@@ -104,7 +116,6 @@ export default function LeavePage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap');
         input::placeholder, textarea::placeholder { color: #1f3825; }
         input:focus, select:focus, textarea:focus {
           border-color: var(--accent, #00e5a0) !important;
@@ -134,6 +145,17 @@ export default function LeavePage() {
               File a Leave
             </div>
           </div>
+
+          {/* Error banner */}
+          {submitError && (
+            <div style={{
+              background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)",
+              borderRadius: "8px", padding: "12px 16px", marginBottom: "18px",
+              color: C.red, fontFamily: mono, fontSize: "0.78rem", letterSpacing: "0.04em",
+            }}>
+              ✗ {submitError}
+            </div>
+          )}
 
           {/* Success banner */}
           {success && (
@@ -205,14 +227,15 @@ export default function LeavePage() {
             />
           </div>
 
-          <button onClick={handleSubmit} style={{
-            display: "block", width: "100%", cursor: "pointer",
+          <button onClick={handleSubmit} disabled={submitting} style={{
+            display: "block", width: "100%", cursor: submitting ? "wait" : "pointer",
             background: "rgba(0,229,160,0.12)", border: "1px solid rgba(0,229,160,0.3)",
             color: C.accent, fontFamily: syne, fontSize: "0.78rem", fontWeight: 700,
             letterSpacing: "0.12em", textTransform: "uppercase", padding: "14px",
             borderRadius: "10px", transition: "background 0.2s",
+            opacity: submitting ? 0.6 : 1,
           }}>
-            ► Submit Leave Request
+            {submitting ? "Submitting…" : "► Submit Leave Request"}
           </button>
         </div>
       </div>

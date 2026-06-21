@@ -1,4 +1,14 @@
-/* Google Fonts loaded via link tags in index.html for offline compatibility */
+/* Standalone fonts — maps design names to local Windows fonts (no internet) */
+@font-face {
+  font-family: 'Syne';
+  src: local('Segoe UI Semibold'), local('Segoe UI'), local('Arial');
+  font-weight: 400 800;
+}
+@font-face {
+  font-family: 'DM Mono';
+  src: local('Consolas'), local('Courier New'), local('monospace');
+  font-weight: 300 500;
+}
 
 :root {
   --bg: #0a0c10;

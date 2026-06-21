@@ -5,6 +5,10 @@ client/node_modules/
 
 # Build outputs
 client/dist/
+client/dist-electron/
+client/build-output/
+client/release/
+client/release-build/
 installer/LogyxDTR-Setup.exe
 
 # Environment files
@@ -42,6 +46,7 @@ electron/runtime/
 # Installer artifacts
 installer/app.ico
 installer/Output/
+client/src/pg-setup/*.exe
 
 # Temporary files
 tmp/

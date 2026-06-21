@@ -164,3 +164,14 @@
   border-color: rgba(167, 139, 250, 0.25);
   background: rgba(167, 139, 250, 0.08);
 }
+.date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-range-sep {
+  color: var(--text-muted, #888);
+  font-size: 13px;
+  flex-shrink: 0;
+}

@@ -103,12 +103,13 @@ const TD = ({ children, color }) => (
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LeaveEvaluationPage() {
-  // ↓ All data comes from the shared context — fed by LeavePage submissions
-  const { submissions, approveLeave, rejectLeave } = useLeave();
+  const { submissions, approveLeave, rejectLeave, error: loadError, loadLeaves } = useLeave();
 
   const [filter, setFilter]         = useState("pending");
   const [remarksReq, setRemarksReq] = useState(null);
   const [confirm, setConfirm]       = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [acting, setActing]         = useState(false);
   const [sortCol, setSortCol]       = useState(null);
   const [sortDir, setSortDir]       = useState("asc");
 
@@ -142,7 +143,7 @@ export default function LeaveEvaluationPage() {
 
   return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap'); button:hover{opacity:0.82}`}</style>
+      <style>{`button:hover{opacity:0.82}`}</style>
       <div style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
         <div style={{ padding: "28px 40px", maxWidth: "1200px", margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
 
@@ -154,6 +155,22 @@ export default function LeaveEvaluationPage() {
             </div>
             <div style={{ fontFamily: syne, fontSize: "1.4rem", fontWeight: 800, letterSpacing: "0.05em", color: C.text }}>Leave Approval</div>
           </div>
+
+          {(loadError || actionError) && (
+            <div style={{
+              background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)",
+              borderRadius: "8px", padding: "12px 16px", marginBottom: "18px",
+              color: C.red, fontFamily: mono, fontSize: "0.78rem",
+            }}>
+              ✗ {actionError || loadError}
+              {loadError && (
+                <button onClick={loadLeaves} style={{
+                  marginLeft: 12, background: "none", border: "none", color: C.accent,
+                  cursor: "pointer", fontFamily: mono, fontSize: "0.72rem", textDecoration: "underline",
+                }}>Retry</button>
+              )}
+            </div>
+          )}
 
           {/* Filter tabs */}
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
@@ -244,9 +261,24 @@ export default function LeaveEvaluationPage() {
       <ConfirmModal
         action={confirm?.action}
         request={confirm?.request}
-        onConfirm={() => {
-          confirm.action === "approve" ? approveLeave(confirm.request.id) : rejectLeave(confirm.request.id);
-          setConfirm(null);
+        onConfirm={async () => {
+          setActing(true);
+          setActionError(null);
+          try {
+            if (confirm.action === "approve") {
+              await approveLeave(confirm.request.id);
+            } else {
+              await rejectLeave(confirm.request.id);
+            }
+            setConfirm(null);
+          } catch (err) {
+            setActionError(
+              err.response?.data?.error || err.message || "Could not update leave request. Check your login and network connection."
+            );
+            setConfirm(null);
+          } finally {
+            setActing(false);
+          }
         }}
         onCancel={() => setConfirm(null)}
       />

@@ -1,0 +1,75 @@
+Logyx DTR — 3 Computer Office Setup
+====================================
+
+GOAL
+----
+  Manager, Assistant Manager, and Employee PCs all see the SAME
+  scans and leave requests in Logyx DTR.
+
+HOW IT WORKS
+------------
+  One computer holds the database (HOST).
+  The other two computers connect to it (CLIENT).
+
+  All data — attendance scans, leave requests, employees —
+  is stored on the HOST PC only.
+
+RECOMMENDED LAYOUT
+------------------
+  PC 1 — HOST (pick one, usually always on)
+         Example: Manager PC or Employee/Scanner PC
+
+  PC 2 — CLIENT
+         Example: Assistant Manager PC
+
+  PC 3 — CLIENT
+         Example: the other manager or employee PC
+
+SETUP STEPS
+-----------
+
+  STEP 1 — Install Logyx DTR on all 3 computers
+           (run LogyxDTR-Setup.exe on each)
+
+  STEP 2 — On the HOST PC only:
+           Run: Setup-As-Host.bat
+           Then open Logyx DTR normally.
+
+  STEP 3 — Find the HOST PC IP address:
+           Windows Settings → Network → Properties
+           Example: 192.168.1.10
+
+  STEP 4 — On the other 2 PCs (CLIENT):
+           Run: Setup-As-Client.bat
+           Enter the HOST IP when asked.
+
+  STEP 5 — On the HOST PC, allow firewall (one time):
+           Windows may ask to allow Node/Electron — click Allow.
+           Or manually allow TCP port 3001 in Windows Firewall.
+
+DAILY USE
+---------
+  HOST PC:
+    - Must run Logyx DTR first (keeps database + server running)
+    - Scanner works here for barcode scans
+
+  CLIENT PCs:
+    - Open Logyx DTR — connects to HOST automatically
+    - Manager / Assistant Manager: login, view records, approve leave
+    - Employee PC: scanner + leave request page
+
+  Everyone sees the same data because all PCs talk to one database.
+
+NETWORK
+-------
+  All 3 PCs must be on the same office Wi-Fi or LAN.
+  No internet or GitHub required — local network only.
+
+TROUBLESHOOTING
+---------------
+  Client PC shows blank or error:
+    - Is the HOST PC running Logyx DTR?
+    - Is the IP address correct in config.json?
+    - Config file location: %APPDATA%\Logyx DTR\config.json
+
+  To reconfigure a client PC, run Setup-As-Client.bat again.

@@ -54,7 +54,7 @@ const TYPE_TO_SERVER = {
 const TYPE_FROM_SERVER = {
   IN: 'TIME IN',
   'LUNCH-OUT': 'LUNCH OUT',
-  'LUNCH-IN': 'LUNCH IN',
+  'LUNCH-IN': 'TIME IN',
   OUT: 'TIME OUT',
   'OT-IN': 'OVERTIME',
   'OT-OUT': 'OVERTIME',

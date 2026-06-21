@@ -31,12 +31,14 @@ const EMPTY_FORM = {
   position: '',
   title_initials: '',
   emp_status: 'ACTIVE',
+  rest_day: '',
 };
 
 const GENDERS = ['', 'MALE', 'FEMALE'];
 const CIVIL_STATUSES = ['', 'SINGLE', 'MARRIED', 'WIDOWED', 'SEPARATED'];
 const BLOOD_TYPES = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const STATUS_OPTIONS = ['ALL', 'ACTIVE', 'INACTIVE'];
+const REST_DAYS = ['', 'saturday', 'sunday', 'saturday,sunday'];
 
 function formatDob(dob) {
   if (!dob) return '—';
@@ -72,6 +74,7 @@ function toPayload(form) {
     share: form.share || null,
     position: form.position || null,
     title_initials: form.title_initials || null,
+    rest_day: form.rest_day || null,
   };
 }
 
@@ -97,6 +100,7 @@ function empToForm(emp) {
     position: emp.position || '',
     title_initials: emp.title_initials || '',
     emp_status: emp.emp_status || 'ACTIVE',
+    rest_day: emp.rest_day || '',
   };
 }
 
@@ -242,6 +246,7 @@ export default function EmployeesPage() {
         <td>${genderAbbr(emp.gender)}</td>
         <td>${emp.position || ''}</td>
         <td>${emp.emp_status || ''}</td>
+        <td>${emp.rest_day ? emp.rest_day.charAt(0).toUpperCase() + emp.rest_day.slice(1) : '—'}</td>
       </tr>`,
       )
       .join('');
@@ -259,7 +264,8 @@ export default function EmployeesPage() {
       <table>
         <thead><tr>
           <th>Employee #</th><th>First Name</th><th>Middle Name</th><th>Surname</th>
-          <th>Initials</th><th>DOB</th><th>Age</th><th>Gender</th><th>Position</th><th>Status</th>
+          <th>Initials</th><th>DOB</th><th>Age</th><th>Gender</th><th>Position</th>
+          <th>Status</th><th>Rest Day</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -391,6 +397,20 @@ export default function EmployeesPage() {
               </select>
             </label>
 
+            {/* ── Rest Day ── */}
+            <label className="form-group">
+              <span>Rest Day</span>
+              <select className="form-select" value={form.rest_day} onChange={set('rest_day')}>
+                {REST_DAYS.map((d) => (
+                  <option key={d || 'none'} value={d}>
+                    {d === '' ? '— None —'
+                      : d === 'saturday,sunday' ? 'Saturday & Sunday'
+                      : d.charAt(0).toUpperCase() + d.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <div className="employees-form-actions">
               {editingId && (
                 <button type="button" className="btn" onClick={resetForm}>
@@ -441,6 +461,7 @@ export default function EmployeesPage() {
                     <th>DOB</th>
                     <th>Age</th>
                     <th>Gender</th>
+                    <th>Rest Day</th>
                     <th />
                   </tr>
                 </thead>
@@ -464,6 +485,11 @@ export default function EmployeesPage() {
                       <td className="col-muted">{formatDob(emp.dob)}</td>
                       <td className="col-muted">{emp.age ?? '—'}</td>
                       <td className="col-muted">{genderAbbr(emp.gender)}</td>
+                      <td className="col-muted">
+                        {emp.rest_day === 'saturday,sunday' ? 'Sat & Sun'
+                          : emp.rest_day ? emp.rest_day.charAt(0).toUpperCase() + emp.rest_day.slice(1)
+                          : '—'}
+                      </td>
                       <td className="col-actions">
                         <button type="button" className="btn-icon btn-edit" title="Edit" onClick={() => startEdit(emp)}>
                           ✎

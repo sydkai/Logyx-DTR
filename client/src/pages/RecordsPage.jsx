@@ -35,7 +35,8 @@ function triggerDownload(blob, filename) {
 
 export default function Records() {
   const [search, setSearch] = useState('');
-  const [date, setDate] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [type, setType] = useState('ALL');
   const [records, setRecords] = useState([]);
   const [total, setTotal] = useState(0);
@@ -43,7 +44,7 @@ export default function Records() {
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filters = { search, date, type };
+  const filters = { search, from, to, type };
 
   async function handleExport(kind) {
     try {
@@ -73,7 +74,7 @@ export default function Records() {
     } finally {
       setLoading(false);
     }
-  }, [search, date, type]);
+  }, [search, from, to, type]);
 
   const sortedRecords = [...records].sort(
     (a, b) => (b.ts || 0) - (a.ts || 0) || (b.id || 0) - (a.id || 0),
@@ -90,7 +91,7 @@ export default function Records() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, date, type]);
+  }, [search, from, to, type]);
 
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
@@ -127,12 +128,23 @@ export default function Records() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <input
-          className="form-input date-input"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
+        <div className="date-range">
+          <input
+            className="form-input date-input"
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            title="From date"
+          />
+          <span className="date-range-sep">–</span>
+          <input
+            className="form-input date-input"
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            title="To date"
+          />
+        </div>
         <select
           className="form-select type-select"
           value={type}
