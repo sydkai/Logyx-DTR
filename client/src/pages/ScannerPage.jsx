@@ -258,13 +258,16 @@ export default function ScannerPage() {
         IN: 'Time In', OUT: 'Time Out',
         'OT-IN': 'OT In', 'OT-OUT': 'OT Out',
         'LUNCH-OUT': 'Lunch Out', 'LUNCH-IN': 'Time In',
+        'M-BREAK': 'Morning Break', 'A-BREAK': 'Afternoon Break',
       }[type];
       const lateTag = attStatus === 'late' ? ' ⚠️ LATE' : attStatus === 'ontime' ? ' ✅ On Time' : '';
 
       showFeedback(
         type.startsWith('OT')                           ? 'ot'      :
         type === 'IN' || type === 'LUNCH-IN'            ? 'success' :
-        type === 'LUNCH-OUT'                            ? 'lunch'   : 'out',
+        type === 'LUNCH-OUT'                            ? 'lunch'   :
+        type === 'M-BREAK' || type === 'A-BREAK'        ? 'lunch'   :
+        type === 'OUT'                                  ? 'out'     : 'success',
         `✓ ${typeLabel} — ${emp.first_name} ${emp.surname}${lateTag}`
       );
       setLastScan({ emp, type, attStatus, time: stamp.time });
@@ -346,7 +349,13 @@ export default function ScannerPage() {
                 <td>{scan.date}</td>
                 <td>{scan.time}</td>
                 <td>
-                  <span className={`badge ${scan.record_type === 'TIME IN' ? 'time-in' : scan.record_type === 'TIME OUT' ? 'time-out' : scan.record_type === 'LUNCH OUT' ? 'lunch' : 'overtime'}`}>
+                  <span className={`badge ${
+                    scan.record_type === 'TIME IN' ? 'time-in'
+                    : scan.record_type === 'TIME OUT' ? 'time-out'
+                    : scan.record_type === 'LUNCH OUT' ? 'lunch'
+                    : scan.record_type === 'MORNING BREAK' || scan.record_type === 'AFTERNOON BREAK' ? 'lunch'
+                    : 'overtime'
+                  }`}>
                     <span className="dot" />
                     {scan.record_type}
                   </span>

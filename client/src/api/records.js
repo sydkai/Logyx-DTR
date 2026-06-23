@@ -14,6 +14,8 @@ function toPageRecord(r) {
     'OT-IN': 'OVERTIME',
     'OT-OUT': 'OVERTIME',
     ABSENT: 'ABSENT',
+    'M-BREAK': 'MORNING BREAK',
+    'A-BREAK': 'AFTERNOON BREAK',
   };
   return {
     id: r.id,

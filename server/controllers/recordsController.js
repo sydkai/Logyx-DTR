@@ -21,10 +21,12 @@ const TYPE_LABELS = {
   'OT-IN': 'OVERTIME',
   'OT-OUT': 'OVERTIME',
   ABSENT: 'ABSENT',
+  'M-BREAK': 'MORNING BREAK',
+  'A-BREAK': 'AFTERNOON BREAK',
 };
 
-const VALID_TYPES = ['IN', 'LUNCH-OUT', 'LUNCH-IN', 'OUT', 'OT-IN', 'OT-OUT', 'ABSENT'];
-const VALID_TYPE_LABELS = ['IN', 'LUNCH OUT', 'LUNCH IN', 'OUT', 'OT-IN', 'OT-OUT', 'ABSENT'];
+const VALID_TYPES = ['IN', 'LUNCH-OUT', 'LUNCH-IN', 'OUT', 'OT-IN', 'OT-OUT', 'ABSENT', 'M-BREAK', 'A-BREAK'];
+const VALID_TYPE_LABELS = ['IN', 'LUNCH OUT', 'LUNCH IN', 'OUT', 'OT-IN', 'OT-OUT', 'ABSENT', 'M-BREAK', 'A-BREAK'];
 
 function localDateString(d = new Date()) {
   const y = d.getFullYear();
